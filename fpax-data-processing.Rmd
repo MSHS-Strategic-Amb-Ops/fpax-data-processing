@@ -1,0 +1,61 @@
+---
+title: "fpax-data-processing"
+author: "Riya"
+date: "2024-08-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(glue)
+library(odbc)
+library(tidyverse)
+library(DBI)
+library(pool)
+
+
+#Aggregating FPAX_MERGED_DETAIL table provider, department, month and summing up to get wrvus, payments and collections
+fpax_processing_drop <- glue("DROP TABLE PROD_FPAX_PHYSICIAN")
+fpax_processing_query <- glue("CREATE TABLE PROD_FPAX_PHYSICIAN AS 
+                              SELECT PERIOD, PERIOD_QUARTER, SUBSTR(PERIOD, 1, 4) AS YEAR, SUBSTR(PERIOD, 5, 6) AS MONTH,
+                              NPI, MD_NAME, ENTITY_DESC, LOCATION_DESC, EPIC_LOCATION_DESC, EPIC_DEPT_DESC, EPIC_DEPT_ID,
+                              SUM(WRVU_NUM) AS WRVU_NUM,
+                              SUM(CALC_CHARGE_AMT) AS CALC_CHARGE_AMT,
+                              SUM(CALC_PAYMENT_AMT) AS CALC_PAYMENT_AMT
+                              FROM FPAX_MERGED_DETAIL
+                              WHERE PERIOD_YEAR >= 2023
+                              GROUP BY PERIOD, PERIOD_QUARTER, SUBSTR(PERIOD, 1, 4), SUBSTR(PERIOD, 5, 6),
+                              NPI, MD_NAME, ENTITY_DESC, LOCATION_DESC, EPIC_LOCATION_DESC, EPIC_DEPT_DESC, EPIC_DEPT_ID;
+                              ")
+
+fpax_processing_index <- glue("CREATE INDEX fpax_processing_index on PROD_FPAX_PHYSICIAN (PERIOD, EPIC_DEPT_ID)")
+
+```
+
+
+```{r Write to Oracle, echo = FALSE, warning = FALSE, message = FALSE}
+
+## Grouped Table execution
+tryCatch({
+  conn1 <- dbConnect(drv = odbc(), "OAO Cloud DB SoYoun", timeout = 30)
+  dbBegin(conn1)
+  
+    if(dbExistsTable(conn1, "PROD_FPAX_PHYSICIAN")){
+      dbExecute(conn1, fpax_processing_drop) 
+    }
+    dbExecute(conn1, fpax_processing_query) 
+    dbExecute(conn1, fpax_processing_index)
+     
+  dbCommit(conn1)
+  dbDisconnect(conn1)
+  print("success")
+  
+},
+error = function(err){
+  print(paste("Error staging:", err$message))
+  dbRollback(conn1)
+  dbDisconnect(conn1)
+})
+
+
+```
