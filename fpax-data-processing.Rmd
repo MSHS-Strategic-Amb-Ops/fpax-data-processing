@@ -21,11 +21,12 @@ fpax_processing_query <- glue("CREATE TABLE PROD_FPAX_PHYSICIAN AS
                               NPI, MD_NAME, ENTITY_DESC, LOCATION_DESC, EPIC_LOCATION_DESC, EPIC_DEPT_DESC, EPIC_DEPT_ID,
                               SUM(WRVU_NUM) AS WRVU_NUM,
                               SUM(CALC_CHARGE_AMT) AS CALC_CHARGE_AMT,
-                              SUM(CALC_PAYMENT_AMT) AS CALC_PAYMENT_AMT
+                              SUM(CALC_PAYMENT_AMT) AS CALC_PAYMENT_AMT,
+                              TRUNC(SYSDATE) AS FPAX_LAST_UPDATED
                               FROM FPAX_MERGED_DETAIL
                               WHERE PERIOD_YEAR >= 2023
                               GROUP BY PERIOD, PERIOD_QUARTER, SUBSTR(PERIOD, 1, 4), SUBSTR(PERIOD, 5, 6),
-                              NPI, MD_NAME, ENTITY_DESC, LOCATION_DESC, EPIC_LOCATION_DESC, EPIC_DEPT_DESC, EPIC_DEPT_ID;
+                              NPI, MD_NAME, ENTITY_DESC, LOCATION_DESC, EPIC_LOCATION_DESC, EPIC_DEPT_DESC, EPIC_DEPT_ID, FPAX_LAST_UPDATED;
                               ")
 
 fpax_processing_index <- glue("CREATE INDEX fpax_processing_index on PROD_FPAX_PHYSICIAN (PERIOD, EPIC_DEPT_ID)")
